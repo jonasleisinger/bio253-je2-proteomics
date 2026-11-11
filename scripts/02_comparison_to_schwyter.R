@@ -6,7 +6,7 @@ data_schwyter_raw <- read_excel("data/schwyter_etal/Original_Data_Schwyter_etal_
 data_new_raw <- read_excel("data/raw/total/DE_total.xlsx", sheet="diff_exp_analysis")
 
 data_schwyter <- data_schwyter_raw %>% rename(proteinname = Protein_ID)
-data_new <- data_new_raw %>% filter(contrast=="TSB_vs_SN_at_anc")
+data_new <- data_new_raw %>% filter(contrast=="TSB_vs_SN_at_anc", CON=="FALSE")
 
 
 # df1_mean and df2_mean = your averaged data frames
