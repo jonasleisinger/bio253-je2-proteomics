@@ -109,13 +109,24 @@ merged_corr <- merged_corr %>%
 anticorr   <- merged_corr %>% filter(contrib < anticorr_cut)
 corr   <- merged_corr %>% filter(contrib > corr_cut)
 
+
+crup <- corr %>% 
+  filter(diff_new>0) %>% 
+  select(uniprot_acc)
+atcrup <- anticorr %>% 
+  filter(diff_new>0) %>% 
+  select(uniprot_acc)
 anticorr_str <- anticorr %>%
   select(uniprot_acc)
 corr_str <- corr %>%
   select(uniprot_acc)
 
+
 write_csv(anticorr_str, "data/outputs/anticorr.csv")
 write_csv(corr_str, "data/outputs/corr.csv")
+
+write_csv(crup, "data/outputs/corrup.csv")
+write_csv(atcrup, "data/outputs/anticorrup.csv")
 
 
 p6 <- ggplot(merged_corr, aes(x = diff_schwyter, y = diff_new, color = contrib < anticorr_cut)) +
@@ -135,7 +146,7 @@ p7 <- ggplot(merged_corr, aes(x = diff_schwyter, y = diff_new, color = contrib >
   theme_bw()
 
 
-p6
+p7
 
 #do only new proteins also show a big/small diff
 
