@@ -13,8 +13,8 @@ proteome <- proteome |> mutate(neg_log10_FDR = -log10(FDR))
 
 #add identifier of up/down
 proteome <- proteome |> mutate(regulation = case_when(
-  diff <= log2(1/2) & neg_log10_FDR >= 1 ~ "down",
-  diff >= log2(2) & neg_log10_FDR >= 1~ "up",
+  diff <= log2(1/2) & neg_log10_FDR >= 1 ~ "up",
+  diff >= log2(2) & neg_log10_FDR >= 1~ "down",
   .default = "n.s."
 ))
 
@@ -23,20 +23,18 @@ proteome_TSB_SN <- proteome |> filter(contrast == "TSB_vs_SN") |> filter(CON != 
 
 
 #threshold regulation
- 
-th_up_table <- proteome_TSB_SN |> filter(regulation == "up") |> arrange(desc(diff))
-th_up_ids <- data.frame(th_up_table$protein_Id[1:30])
+
+thresholds <- cutGn(proteome_TSB_SN$diff, m = length(proteome_TSB_SN$diff) / 5, what = "summary")
+th_down_ids <- data.frame(proteome_TSB_SN$protein_Id[proteome_TSB_SN$diff > thresholds[5,1]])
+th_up_ids <- data.frame(proteome_TSB_SN$protein_Id[proteome_TSB_SN$diff < thresholds[1,2]])
 colnames(th_up_ids) <- "ID"
-
-
-th_down_table <- proteome_TSB_SN |> filter(regulation == "down") |> arrange(desc(diff))
-th_down_ids <- data.frame(th_down_table$protein_Id[1:30])
 colnames(th_down_ids) <- "ID"
+
 
 protein_of_interest <- data.frame(rbind(th_down_ids, th_up_ids))
 
 #get uniprot labels of proteins
-uniprot_conversion <- read_tsv(file = "uniprot reference/JE2_protein_metadata.tsv")
+uniprot_conversion <- read_tsv(file = "data/reference/uniprot reference/JE2_protein_metadata.tsv")
 
 proteins_of_interest_uniprot <- uniprot_conversion |> filter(fasta_id %in% protein_of_interest$ID) |> select(uniprot_entry_name)
 

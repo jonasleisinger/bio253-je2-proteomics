@@ -32,8 +32,8 @@ protein_abundances_TSB_SN <- protein_abundances |> filter(contrast == "TSB_vs_SN
 
 #add classification of cutoff 
 protein_abundances_TSB_SN <- protein_abundances_TSB_SN |> mutate(regulation = case_when(
-  diff <= log2(1/2) & neg__log10_FDR >= 1 ~ "down",
-  diff >= log2(2) & neg__log10_FDR >= 1~ "up",
+  diff <= log2(1/2) & neg__log10_FDR >= 1 ~ "up",
+  diff >= log2(2) & neg__log10_FDR >= 1~ "down",
   .default = "n.s."
 ))
 
