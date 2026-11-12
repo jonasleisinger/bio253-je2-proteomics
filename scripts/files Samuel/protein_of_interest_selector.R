@@ -62,8 +62,16 @@ write_csv(proteins_of_interest_uniprot_down, "proteins_of_interest_down.csv")
 
 #take all up/downregulated proteins 
 
-proteome_TSB_SN_uniprot <- uniprot_conversion |> filter(fasta_id %in% proteome_TSB_SN$protein_Id) |> select(uniprot_entry_name)
-write_csv(proteome_TSB_SN_uniprot, "proteome_TSB_SN_uniprot.csv")
+a <- merge(proteome_TSB_SN,
+           uniprot_conversion,
+           by.x= "protein_Id" ,
+           by.y = "fasta_id",
+           all=F)
+
+proteome_TSB_SN_uniprot_diff <- a |> select(uniprot_entry_name, diff)
+
+
+write_csv(proteome_TSB_SN_uniprot_diff, "proteome_TSB_SN_uniprot_diff.csv")
 
 
 
