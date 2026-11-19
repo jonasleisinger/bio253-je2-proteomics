@@ -7,11 +7,17 @@ library(readr)
 #data import
 data_schwyter_raw <- read_excel("data/schwyter_etal/Original_Data_Schwyter_etal_2025_mSystems.xlsx", sheet="Figure3(A)_S3")
 data_new_raw <- read_excel("data/raw/total/DE_total.xlsx", sheet="diff_exp_analysis")
-mapping <- read.delim("~/bio253-je2-proteomics/data/raw/resources/mapping_uniprot/JE2_protein_metadata.tsv")
+mapping <- read.delim("data/raw/resources/mapping_uniprot/JE2_protein_metadata.tsv")
 
 #data tidying
-data_schwyter <- data_schwyter_raw %>% rename(proteinname = Protein_ID)
-data_new <- data_new_raw %>% filter(contrast=="TSB_vs_SN_at_anc", CON=="FALSE")
+data_schwyter <- data_schwyter_raw %>%
+  rename(proteinname = Protein_ID) %>%
+  mutate(diff= -diff)
+  #filter(diff> -8)
+data_new <- data_new_raw %>%
+  filter(contrast=="TSB_vs_SN_at_anc", CON=="FALSE") %>%
+  mutate(diff= -diff)
+  #filter(diff> -8)
 
 data_schwyter <- data_schwyter %>% mutate(in_schwyter = TRUE)
 data_new <- data_new %>% mutate(in_new = TRUE)
@@ -23,7 +29,7 @@ merged <- full_join(data_schwyter, data_new, by = "proteinname", suffix = c("_sc
     origin = case_when(
       in_schwyter & in_new ~ "both",
       in_schwyter          ~ "only schwyter",
-      in_new          ~ "only new"
+      in_new          ~ "only current"
     )
   ) %>%
   select(-in_schwyter, -in_new)
@@ -32,36 +38,28 @@ merged <- merged %>%
   left_join(select(mapping, protein_key, uniprot_acc),
             by = c("proteinname" = "protein_key"))
 
+
 #*IMPROVEMENT OF MEASUREMENT: NEWLY DISCOVERED PROTEINS IN OUR DATASET*
 
 #export datasets for string analysis
 str_new <- merged %>%
-  filter(origin=="only new") %>%
+  filter(origin=="only current") %>%
   select(uniprot_acc)
 
 str_all <- merged %>%
   select(uniprot_acc)
 
-write_csv(str_new, "data/outputs/newprot.csv")
-write_csv(str_all, "data/outputs/allprot.csv")
-
-#plot differences between datasets
-
-# p1<- ggplot(merged, aes(x = origin, y = avgAbd_new)) +
-#   geom_boxplot() +
-#   theme_bw()
-# 
-# p2<- ggplot(merged, aes(x = origin, y = avgAbd_schwyter)) +
-#   geom_boxplot() +
-#   theme_bw()
-# 
-# p1+p2
+write_csv(str_new, "data/outputs/combined/newprot.csv")
+write_csv(str_all, "data/outputs/combined/allprot.csv")
 
 
-p3 <- ggplot(merged, aes(x = avgAbd_new, color=origin)) +
-  geom_density(linewidth = 1) +
-  labs(x = "Average abundance per protein", y = "Count") +
-  theme_minimal()
+
+p3 <- ggplot(merged, aes(x = avgAbd_new, fill=origin)) +
+  geom_histogram() +
+  labs(x = "Abundance per protein", y = "Count") +
+  scale_fill_manual(values = c("only current" = "magenta", "both" = "darkblue"),
+                     name = NULL) +
+  theme_bw()
 
 p3
 
@@ -74,31 +72,33 @@ merged_corr <- merged %>%
 
 # correlation value
 r  <- cor(merged_corr$diff_schwyter, merged_corr$diff_new, use = "complete.obs", method = "pearson")
-rho <- cor(merged_corr$diff_schwyter, merged_corr$diff_new, use = "complete.obs", method = "spearman")
+
 
 p4 <- ggplot(merged_corr, aes(x = diff_schwyter, y = diff_new)) +
-  geom_point(alpha = 0.6,  colour="darkblue") +
+  geom_point(colour="darkblue") +
   geom_smooth(method = "lm", se = TRUE,  colour="darkblue") +
   annotate("text", x = -Inf, y = Inf, hjust = -0.1, vjust = 1.5,
-           label = sprintf("Pearson r = %.2f\nSpearman rho = %.2f\nn = %d",
-                           r, rho, nrow(merged))) +
-  labs(x = "diff schwyter", y = "diff new") +
+           label = sprintf("Pearson r = %.2f\nn = %d",
+                           r, nrow(merged_corr))) +
+  labs(x = "log2 FC Schwyter et. al", y = "log2 FC current") +
+  xlim(-6, 6) + ylim(-6, 6)+
   theme_bw()
 
 p5 <- ggplot(merged_corr, aes(x = diff_schwyter, y = diff_new, colour=sig)) +
-  geom_point(alpha = 0.6) +
+  geom_point() +
   geom_smooth(method = "lm", se = TRUE) +
   scale_color_manual(values = c("FDR < 0.01 in both" = "magenta", "otherwise" = "darkblue"),
                      name = NULL) +
   # annotate("text", x = -Inf, y = Inf, hjust = -0.1, vjust = 1.5,
   #          label = sprintf("Pearson r = %.2f\nSpearman rho = %.2f\nn = %d",
   #                          r, rho, nrow(merged))) +
-  labs(x = "diff schwyter", y = "diff new") +
+  labs(x = "log2 FC Schwyter et. al", y = "log2 FC current") +
+  xlim(-6, 6) + ylim(-6, 6)+
   theme_bw()
 
 p4
 
-#correlated and anticorrelated points
+#*UP AND DOWNREGULATED PROTEINS FOR STRING COMPARISON OF DATASETS*
 anticorr_cut=-0.5
 corr_cut=1
 
@@ -113,6 +113,9 @@ corr   <- merged_corr %>% filter(contrib > corr_cut)
 crup <- corr %>% 
   filter(diff_new>0) %>% 
   select(uniprot_acc)
+crdwn <- corr %>% 
+  filter(diff_new<0) %>% 
+  select(uniprot_acc)
 atcrup <- anticorr %>% 
   filter(diff_new>0) %>% 
   select(uniprot_acc)
@@ -121,32 +124,105 @@ anticorr_str <- anticorr %>%
 corr_str <- corr %>%
   select(uniprot_acc)
 
+crup2 <- merged_corr %>%
+  filter(diff_schwyter>0.7, diff_new>0.7) %>%
+  select(uniprot_acc)
 
-write_csv(anticorr_str, "data/outputs/anticorr.csv")
-write_csv(corr_str, "data/outputs/corr.csv")
+crdwn2 <- merged_corr %>%
+  filter(diff_schwyter< -1, diff_new< -1) %>%
+  select(uniprot_acc)
 
-write_csv(crup, "data/outputs/corrup.csv")
-write_csv(atcrup, "data/outputs/anticorrup.csv")
+gsea_schwyter <- merged %>%
+  filter(origin!="only current")%>%
+  select(uniprot_acc, diff_schwyter)
+
+gsea_current <- merged %>%
+  filter(origin!="only schwyter")%>%
+  select(uniprot_acc, diff_new)
+
+gsea_both_diffcurr <- merged %>%
+  filter(origin=="both")%>%
+  select(uniprot_acc, diff_new)
+
+gsea_only_current <- merged %>%
+  filter(origin=="only current")%>%
+  select(uniprot_acc, diff_new)
 
 
-p6 <- ggplot(merged_corr, aes(x = diff_schwyter, y = diff_new, color = contrib < anticorr_cut)) +
-  geom_point(alpha = 0.6) +
-  scale_color_manual(values = c("FALSE" = "black", "TRUE" = "magenta"),
-                     labels = c("FALSE" = "Other", "TRUE" = "anticorrelated"),
+write_csv(anticorr_str, "data/outputs/combined/anticorr.csv")
+write_csv(corr_str, "data/outputs/combined/corr.csv")
+
+write_csv(crup, "data/outputs/combined/corrup.csv")
+write_csv(crdwn, "data/outputs/combined/corrdwn.csv")
+write_csv(atcrup, "data/outputs/combined/anticorrup.csv")
+
+write_csv(gsea_schwyter, "data/outputs/combined/gsea_schwyter.csv")
+write_csv(gsea_current, "data/outputs/combined/gsea_current.csv")
+write_csv(gsea_both_diffcurr, "data/outputs/combined/gsea_both_diffcurr.csv")
+write_csv(gsea_only_current, "data/outputs/combined/gsea_only_current.csv")
+
+write_csv(crup2, "data/outputs/combined/corrup2.csv")
+write_csv(crdwn2, "data/outputs/combined/corrdwn2.csv")
+
+
+#TSB abundace matrix
+data_new_mat <- read_excel("data/raw/total/DE_total.xlsx", sheet="normalized_abundances_matrix")
+
+data_new_mat <- data_new_mat %>%
+  left_join(select(mapping, protein_key, uniprot_acc),
+            by = c("proteinname" = "protein_key"))
+
+TSBabd <- data_new_mat %>%
+  mutate(TSBavg = rowMeans(across(c(JE2anc_TSB_1, JE2anc_TSB_2, JE2anc_TSB_3)), na.rm = TRUE)) %>%
+  select(uniprot_acc, TSBavg)
+TSBtop <- TSBabd %>%
+  filter(TSBavg>18) %>%
+  select(uniprot_acc)
+
+
+
+write_csv(TSBabd, "data/outputs/combined/TSBabd.csv")
+write_csv(TSBtop, "data/outputs/combined/TSBtop.csv")
+
+#all proteins for string
+allprstr <- merged_corr %>%
+  select(uniprot_acc)
+
+write_csv(allprstr, "data/outputs/combined/allprot.csv")
+
+
+p6 <- ggplot(merged_corr, aes(x = diff_schwyter, y = diff_new)) +
+  geom_point(aes(color = contrib < anticorr_cut)) +
+  geom_smooth(method = "lm", se = TRUE, color="black") +
+  scale_color_manual(values = c("FALSE" = "darkblue", "TRUE" = "magenta"),
+                     labels = c("FALSE" = "rest", "TRUE" = "opposite dir."),
                      name = NULL) +
-  labs(x = "diff schwyter", y = "diff new") +
+  annotate("text", x = -Inf, y = Inf, hjust = -0.1, vjust = 1.5,
+           label = sprintf("Pearson r = %.2f\nn = %d",
+                           r, nrow(merged_corr))) +
+  labs(x = "log2 FC Schwyter et. al", y = "log2 FC current") +
+  xlim(-6, 6) + ylim(-6, 6)+
   theme_bw()
 
-p7 <- ggplot(merged_corr, aes(x = diff_schwyter, y = diff_new, color = contrib > corr_cut)) +
-  geom_point(alpha = 0.6) +
-  scale_color_manual(values = c("FALSE" = "black", "TRUE" = "magenta"),
-                     labels = c("FALSE" = "Other", "TRUE" = "correlated"),
-                     name = NULL) +
-  labs(x = "diff schwyter", y = "diff new") +
+p7 <- ggplot(merged_corr, aes(x = diff_schwyter, y = diff_new)) +
+  geom_point(aes(color = case_when(
+    contrib > corr_cut     ~ "same dir.",
+    contrib < anticorr_cut ~ "opposite dir.",
+    TRUE                   ~ "n.s."
+  ))) +
+  scale_color_manual(values = c("same dir." = "magenta",
+                                "opposite dir." = "cyan",
+                                "n.s." = "darkblue")) +
+  geom_smooth(method = "lm", se = TRUE, color="black") +
+  annotate("text", x = -Inf, y = Inf, hjust = -0.1, vjust = 1.5,
+           label = sprintf("Pearson r = %.2f\nn = %d",
+                           r, nrow(merged_corr))) +
+  labs(x = "log2 FC Schwyter et. al", y = "log2 FC current") +
+  xlim(-6, 6) + ylim(-6, 6)+
   theme_bw()
 
 
-p7
+p3
 
 #do only new proteins also show a big/small diff
 
@@ -157,4 +233,15 @@ p8<-ggplot(merged, aes(x = diff_new, y = -log10(FDR_new), color = origin)) +
   labs(x = "Difference (log2 fold change)", y = "-log10(FDR)") +
   theme_minimal()
 
-p8
+p4
+
+
+#*COMPARE TO STATIONARY GROWTH PHASE INDUCED GENES* haha fuer gar nuet gsi
+data_statgrowth <- read_excel("data/external_data/TableS3.xlsx", sheet="genes induced stat. phase")
+
+data_statgrowth <- data_statgrowth %>%
+  select(uniprot_acc, diff)
+
+plt_growth <- inner_join(data_statgrowth, merged,
+                         by = c("uniprot_acc"),
+                         suffix = c("_ext", "_our"))
