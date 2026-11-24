@@ -39,8 +39,8 @@ protein_abundances_TSB_SN <- protein_abundances_TSB_SN |> mutate(regulation = ca
 
 #make color labels
 manual_colors = c(
-  "down" = "tan",
-  "up" = "turquoise",
+  "down" = "darkblue",
+  "up" = "magenta",
   "n.s" = "lightgrey"
 )
 #make vulcan plot for this case alone:
