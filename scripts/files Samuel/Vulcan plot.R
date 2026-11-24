@@ -10,20 +10,9 @@ library(tidyverse)
 
 protein_abundances <- readxl::read_excel("data/raw/total/DE_total.xlsx", sheet = "diff_exp_analysis")
 
-#get relevant data seperated
 
-protein_abundances_clean <- protein_abundances |> select(protein_Id
-                                                        ,contrast,
-                                                        p.value,
-                                                        diff,
-                                                        FDR, proteinname,
-                                                        avgAbd)
-
-
-#add axis of vulcan plot to dataset (-log10_FDR, log2_FC)
+#add axis of vulcan plot to dataset (-log10_FDR) 
 protein_abundances <- protein_abundances |> mutate(neg__log10_FDR = -log10(FDR))
-
-
 
 
 #take only data of contrast TSB vs SN:
@@ -35,6 +24,7 @@ protein_abundances_TSB_SN <- protein_abundances_TSB_SN |> mutate(regulation = ca
   -diff >= log2(2) & neg__log10_FDR >= 1~ "up",
   .default = "n.s."
 ))
+
 
 
 #make color labels
