@@ -1,0 +1,77 @@
+---
+output:
+  pdf_document: default
+  html_document: default
+---
+
+
+## Vulcano plots highlight the amount of interesting proteins
+
+
+
+# Data wrangling
+
+The new data was loaded. To better work with the data, the only the entries for TSB vs. SN were used. To plot the data in a volcano plot, an additional variable is added.
+```{r}
+#import needed libraries
+library(tidyverse)
+
+#get our data in
+suppressWarnings(
+protein_abundances <- readxl::read_excel("/home/BIO144_FS26/Users/samlut/Research cycles in omics/bio253-je2-proteomics/bio253-je2-proteomics/data/raw/total/DE_total.xlsx", sheet = "diff_exp_analysis")
+)
+
+
+#take only data of contrast TSB vs SN:
+protein_abundances_TSB_SN <- protein_abundances |> filter(contrast == "TSB_vs_SN")
+
+#add axis of vulcan plot to dataset (-log10_FDR) 
+protein_abundances_TSB_SN <- protein_abundances_TSB_SN |> mutate(neg__log10_FDR = -log10(FDR))
+
+
+```
+
+
+The entries have to be classified based on their differential expression and the FDR value. Because the cutoff is biologically arbitrary, we used a common cutoff in the field of a differential expression of at least twice or a half. For a broader array of possible proteins the FDR of 0.1 was chosen as the cutoff.
+
+For better presentation in the plot, the direction of the differential expression was changed, such that upregulation is positive and downregulation is negative. 
+```{r}
+#add classification of cutoff 
+protein_abundances_TSB_SN <- protein_abundances_TSB_SN |> mutate(regulation = case_when(
+  -diff <= log2(1/2) & neg__log10_FDR >= 1 ~ "down",
+  -diff >= log2(2) & neg__log10_FDR >= 1~ "up",
+  .default = "n.s."
+))
+
+```
+
+
+
+## Plotting
+
+```{r}
+#make color labels
+manual_colors = c(
+  "down" = "darkblue",
+  "up" = "magenta",
+  "n.s" = "lightgrey"
+)
+
+#create vulcano plot
+a <- ggplot(data = protein_abundances_TSB_SN, aes(x = -diff, y = neg__log10_FDR, col = regulation)) +
+  geom_point() +
+  geom_hline(yintercept = 1, col = "gray", linetype = "dashed") +
+  geom_vline(xintercept = log2(1/2), col = "gray", linetype = "dashed") +
+  geom_vline(xintercept = log2(2), col = "gray", linetype = "dashed") +
+  ggtitle("Change in protein regulation TSB vs. SN") +
+  xlab("-log2_FC (TSB / PASN)") +
+  ylab("-log10_FDR") +
+  scale_color_manual(values = manual_colors)
+
+
+plotly::ggplotly(a)
+
+
+```
+
+
