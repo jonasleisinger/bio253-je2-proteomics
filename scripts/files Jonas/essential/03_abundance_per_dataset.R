@@ -3,6 +3,7 @@ library(dplyr)
 library(ggplot2)
 library(patchwork)
 library(readr)
+library(stringr)
 
 #data import
 data_schwyter_raw <- read_excel("data/schwyter_etal/Original_Data_Schwyter_etal_2025_mSystems.xlsx", sheet="Figure3(A)_S3")
@@ -245,3 +246,42 @@ data_statgrowth <- data_statgrowth %>%
 plt_growth <- inner_join(data_statgrowth, merged,
                          by = c("uniprot_acc"),
                          suffix = c("_ext", "_our"))
+
+#*ARE OXIDATIVE STRESS PROTEINS FROM SCHWYTER ALSO UPREGULATED IN NEW*
+oxstress <- read.delim("C:/Users/jonas/bio253-je2-proteomics/data/external_data/string_protein_annotations_23_nodes.tsv", header=FALSE, comment.char="#")
+oxstress <- oxstress%>%
+  select(V5)
+
+
+
+oxstress$V5 <- sapply(strsplit(oxstress$V5, "\\s*,\\s*"), function(x) {
+  hits <- x[nchar(x) == 6]
+  if (length(hits) > 0) tail(hits, 1) else NA_character_
+})
+
+ox_merged <- merged %>%
+  inner_join(select(oxstress, V5),
+            by = c("uniprot_acc" = "V5")) %>%
+  select(diff_new, diff_schwyter, uniprot_acc)
+
+sum(ox_merged$diff_new)
+sum(ox_merged$diff_schwyter)
+
+
+
+vir <- read.delim("C:/Users/jonas/bio253-je2-proteomics/data/external_data/string_protein_annotations_11_nodes.tsv", header=FALSE, comment.char="#")
+vir <- vir%>%
+  select(V5)
+
+vir$V5 <- sapply(strsplit(vir$V5, "\\s*,\\s*"), function(x) {
+  hits <- x[nchar(x) == 6]
+  if (length(hits) > 0) tail(hits, 1) else NA_character_
+})
+
+vir_merged <- merged %>%
+  inner_join(select(vir, V5),
+             by = c("uniprot_acc" = "V5")) %>%
+  select(diff_new, diff_schwyter, uniprot_acc)
+
+sum(vir_merged$diff_new)
+sum(vir_merged$diff_schwyter, na.rm=TRUE)
